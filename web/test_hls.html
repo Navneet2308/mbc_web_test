@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS.js Test - MBC Radio</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #4CAF50;
+            color: white;
+        }
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+        .status.warning {
+            background: #ff9800;
+            color: white;
+        }
+        .status.info {
+            background: #2196F3;
+            color: white;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        #logs {
+            background: #1a1a1a;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px;
+        }
+        .log-success { color: #4CAF50; }
+        .log-error { color: #f44336; }
+        .log-warning { color: #ff9800; }
+        .log-info { color: #2196F3; }
+        audio {
+            width: 100%;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 HLS.js Radio Stream Test</h1>
+        
+        <div id="hlsStatus" class="status info">Checking HLS.js availability...</div>
+        
+        <div>
+            <h3>Test Stream:</h3>
+            <input type="text" id="streamUrl" value="https://radio.mbcplay.tv/bestfm.m3u8" 
+                   style="width: 100%; padding: 10px; font-size: 14px; border-radius: 5px; border: 1px solid #555; background: #1a1a1a; color: #fff;">
+        </div>
+        
+        <div style="margin: 20px 0;">
+            <button id="playBtn" onclick="playStream()">▶️ Play Stream</button>
+            <button id="stopBtn" onclick="stopStream()" disabled>⏹️ Stop Stream</button>
+        </div>
+        
+        <audio id="audio" controls style="display: none;"></audio>
+        
+        <h3>Console Logs:</h3>
+        <div id="logs"></div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 5px;">
+            <h4>Instructions:</h4>
+            <ol>
+                <li>Check if HLS.js is loaded (status above should be green)</li>
+                <li>Click "Play Stream" button to test the radio stream</li>
+                <li>Check the console logs for any errors</li>
+                <li>If successful, your Flutter app should also work</li>
+            </ol>
+            <p><strong>Note:</strong> This test page helps diagnose HLS.js loading issues in your browser.</p>
+        </div>
+    </div>
+
+    <!-- Load HLS.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+    
+    <script>
+        let hls = null;
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('hlsStatus');
+        const logsDiv = document.getElementById('logs');
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${time}] ${message}`;
+            logsDiv.appendChild(entry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            console.log(message);
+        }
+
+        // Check if HLS.js is loaded
+        window.addEventListener('load', function() {
+            if (window.Hls) {
+                if (Hls.isSupported()) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = `✅ HLS.js loaded successfully! Version: ${Hls.version}`;
+                    log('✅ HLS.js is available and supported', 'success');
+                    log(`Version: ${Hls.version}`, 'info');
+                } else {
+                    statusDiv.className = 'status warning';
+                    statusDiv.textContent = '⚠️ HLS.js loaded but not supported on this browser (Try Safari for native HLS)';
+                    log('⚠️ HLS.js not supported, but native HLS might work', 'warning');
+                }
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ HLS.js failed to load! Check your internet connection.';
+                log('❌ HLS.js is NOT available', 'error');
+                playBtn.disabled = true;
+            }
+        });
+
+        function playStream() {
+            const streamUrl = document.getElementById('streamUrl').value;
+            
+            if (!streamUrl) {
+                log('❌ Please enter a stream URL', 'error');
+                return;
+            }
+
+            log(`🎵 Attempting to play: ${streamUrl}`, 'info');
+
+            if (Hls.isSupported()) {
+                log('Using HLS.js for playback', 'info');
+                
+                hls = new Hls({
+                    debug: false,
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                });
+
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    log('✅ HLS manifest parsed successfully', 'success');
+                    audio.style.display = 'block';
+                    audio.play()
+                        .then(() => {
+                            log('▶️ Audio playback started', 'success');
+                            playBtn.disabled = true;
+                            stopBtn.disabled = false;
+                        })
+                        .catch(error => {
+                            log(`❌ Playback error: ${error.message}`, 'error');
+                        });
+                });
+
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        log(`💥 Fatal HLS error: ${data.type} - ${data.details}`, 'error');
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                log('🔄 Trying to recover from network error...', 'warning');
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                log('🔄 Trying to recover from media error...', 'warning');
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                log('❌ Cannot recover from this error', 'error');
+                                stopStream();
+                                break;
+                        }
+                    } else {
+                        log(`⚠️ Non-fatal HLS error: ${data.details}`, 'warning');
+                    }
+                });
+
+                hls.loadSource(streamUrl);
+                hls.attachMedia(audio);
+                
+            } else if (audio.canPlayType('application/vnd.apple.mpegurl')) {
+                log('Using native HLS support (Safari)', 'info');
+                audio.src = streamUrl;
+                audio.style.display = 'block';
+                audio.play()
+                    .then(() => {
+                        log('▶️ Audio playback started (native)', 'success');
+                        playBtn.disabled = true;
+                        stopBtn.disabled = false;
+                    })
+                    .catch(error => {
+                        log(`❌ Playback error: ${error.message}`, 'error');
+                    });
+            } else {
+                log('❌ HLS not supported on this browser', 'error');
+            }
+        }
+
+        function stopStream() {
+            log('⏹️ Stopping stream...', 'info');
+            
+            if (hls) {
+                hls.destroy();
+                hls = null;
+                log('✅ HLS instance destroyed', 'success');
+            }
+            
+            audio.pause();
+            audio.src = '';
+            audio.style.display = 'none';
+            
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            log('✅ Stream stopped', 'success');
+        }
+
+        // Audio element event listeners
+        audio.addEventListener('playing', () => log('🎵 Audio is playing', 'success'));
+        audio.addEventListener('pause', () => log('⏸️ Audio paused', 'info'));
+        audio.addEventListener('error', (e) => log(`❌ Audio error: ${audio.error?.code}`, 'error'));
+        audio.addEventListener('waiting', () => log('⏳ Buffering...', 'warning'));
+        audio.addEventListener('canplay', () => log('✅ Audio ready to play', 'success'));
+    </script>
+</body>
+</html>
+
